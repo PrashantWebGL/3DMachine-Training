@@ -783,15 +783,24 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const onTouchEnd = () => {
       this.pinchStartDist = 0;
     };
+    // Attach both to canvas and window to catch touches during AR domOverlay
     dom.addEventListener('touchstart', onTouchStart, { passive: false });
     dom.addEventListener('touchmove', onTouchMove, { passive: false });
     dom.addEventListener('touchend', onTouchEnd);
     dom.addEventListener('touchcancel', onTouchEnd);
+    window.addEventListener('touchstart', onTouchStart, { passive: false });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
     this.pinchListenerCleanup = () => {
       dom.removeEventListener('touchstart', onTouchStart);
       dom.removeEventListener('touchmove', onTouchMove);
       dom.removeEventListener('touchend', onTouchEnd);
       dom.removeEventListener('touchcancel', onTouchEnd);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
     };
   }
 
