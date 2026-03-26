@@ -94,6 +94,10 @@
   padding: 10px 14px !important;
 }
 
+.xr-button + .xr-button {
+  right: 88px; /* offset the second button to avoid overlap */
+}
+
 .tag-badge {
   position: absolute;
   transform: translate(-50%, -50%);
