@@ -46,11 +46,11 @@ export class AppComponent implements OnInit {
       imagePath: 'assets/thumbnails/delta_robot_irb_390.png',
     },
     {
-      id: 'kuka_manipulator',
-      name: 'Kuka Manipulator',
+      id: 'boka_manipulator',
+      name: 'Boka Manipulator',
       description: 'Collaborative-style manipulator with multi-step path.',
-      glbPath: 'assets/models/industrial_robots_from_kuka_manipulator.glb',
-      imagePath: 'assets/thumbnails/kuka_manipulator.png',
+      glbPath: 'assets/models/boka_manipulator.glb',
+      imagePath: 'assets/thumbnails/boka_manipulator.png',
     },
   ];
 
