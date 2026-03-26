@@ -95,11 +95,23 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['course'] && this.course) {
-      this.isLoading = true;
-      this.loadingProgress = 0;
-      this.loadError = '';
-      this.cdr.markForCheck();
-      setTimeout(() => this.course && this.loadCourse(this.course), 0);
+      const prev: Course | null = changes['course'].previousValue;
+      const curr: Course = this.course;
+      const modelChanged = !prev || prev.id !== curr.id || prev.modelUrl !== curr.modelUrl;
+
+      if (modelChanged) {
+        this.isLoading = true;
+        this.loadingProgress = 0;
+        this.loadError = '';
+        this.cdr.markForCheck();
+        setTimeout(() => this.course && this.loadCourse(this.course), 0);
+      } else {
+        // Same model; just sync metadata without reloading to avoid flashing
+        this.tags = [...curr.tags];
+        this.animationStops = this.sanitizeStops(curr.animationStops);
+        this.resetNextStopIndex(this.currentTime);
+        this.cdr.markForCheck();
+      }
     }
     if (changes['editMode'] && !this.editMode) {
       this.pendingTagPosition = null;
