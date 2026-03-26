@@ -403,7 +403,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.scene.add(model);
       if (this.renderer.xr.isPresenting) {
         // Keep it out of view until AR surface is detected
-        this.model.position.set(0, -1000, 0);
+        model.position.set(0, -1000, 0);
       }
 
       try {
