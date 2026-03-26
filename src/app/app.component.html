@@ -1,0 +1,146 @@
+<div class="landing" *ngIf="view === 'landing'">
+  <div class="card landing-card">
+    <h1>3D Training Platform</h1>
+    <p class="muted">Choose your role to continue.</p>
+    <div class="role-buttons">
+      <button class="primary" (click)="openRole('trainer')">Trainer</button>
+      <button class="ghost" (click)="openRole('trainee')">Trainee</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell" *ngIf="view !== 'landing'">
+  <aside class="sidebar">
+    <div class="brand">3D Training</div>
+    <nav *ngIf="role === 'trainer'">
+      <button class="nav-btn" [class.active]="trainerTab === 'create'" (click)="startNewCourse()">Create Course</button>
+      <button class="nav-btn" [class.active]="trainerTab === 'my-courses'" (click)="trainerTab = 'my-courses'">
+        My Courses
+      </button>
+      <button class="nav-btn" (click)="view = 'landing'">Logout</button>
+    </nav>
+    <nav *ngIf="role === 'trainee'">
+      <button class="nav-btn" [class.active]="trainerTab === 'my-courses'" (click)="trainerTab = 'my-courses'">
+        My Courses
+      </button>
+      <button class="nav-btn" (click)="view = 'landing'">Logout</button>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <section class="cards" *ngIf="role === 'trainer' && trainerTab === 'create'">
+      <div class="card" *ngIf="trainerStep === 'create'">
+        <div class="card-title">Step 1: Course details</div>
+        <label class="stacked">Name <input [(ngModel)]="draftTitle" placeholder="Course name" /></label>
+        <label class="stacked">
+          Description
+          <textarea rows="3" [(ngModel)]="draftDescription" placeholder="What will trainees learn?"></textarea>
+        </label>
+        <button class="primary full" (click)="createCourse()">Next: Upload Model</button>
+      </div>
+
+      <div class="card" *ngIf="showUploadStep()">
+        <div class="card-title">Step 2: Upload GLB model</div>
+        <label class="stacked file-picker">
+          Select .glb file
+          <input type="file" accept=".glb" (change)="onModelFileSelected($event)" />
+          <span class="file-name">{{ draftModelName || 'No file selected' }}</span>
+        </label>
+        <p class="muted small">After upload the model will appear below for tagging and timeline stops.</p>
+
+        <div class="library">
+          <div class="library-header">Or choose a bundled model</div>
+          <div class="library-grid">
+            <button class="library-card" type="button" *ngFor="let model of libraryModels" (click)="useLibraryModel(model)">
+              <img [src]="model.imagePath" [alt]="model.name" />
+              <div class="library-meta">
+                <div class="title">{{ model.name }}</div>
+                <div class="meta">{{ model.description }}</div>
+                <div class="meta small">{{ model.glbPath }}</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards" *ngIf="trainerTab === 'my-courses'">
+      <div class="card">
+        <div class="card-title">My Courses</div>
+        <div class="course-list">
+          <div
+            class="course-row"
+            *ngFor="let course of courses"
+            [class.active]="course.id === selectedCourse?.id"
+          >
+            <div>
+              <div class="title">{{ course.title }}</div>
+              <div class="meta">{{ course.description }}</div>
+              <div class="meta">
+                Tags: {{ course.tags.length }} · Stops: {{ course.animationStops.length }} · Status:
+                {{ course.status || 'draft' }}
+              </div>
+            </div>
+            <div class="row-actions">
+              <button class="ghost" (click)="selectCourse(course)">
+                {{ role === 'trainer' ? 'Edit/Preview' : 'Open' }}
+              </button>
+              <button
+                class="ghost danger"
+                *ngIf="role === 'trainer'"
+                (click)="deleteCourse(course.id)"
+                [disabled]="course.id === 'starter-course'"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+          <div class="muted small" *ngIf="role === 'trainer'">
+            If a course was created from an uploaded file and shows a blob:// error, re-attach a bundled model:
+            <div class="row-actions wrap">
+              <button class="ghost" type="button" (click)="applySampleModel('assets/models/industrial_robot_arm.glb')">
+                Use Robot Arm
+              </button>
+              <button class="ghost" type="button" (click)="applySampleModel('assets/models/delta_robot_irb_390.glb')">
+                Use Delta Robot
+              </button>
+              <button
+                class="ghost"
+                type="button"
+                (click)="applySampleModel('assets/models/industrial_robots_from_kuka_manipulator.glb')"
+              >
+                Use Kuka Manipulator
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="viewer-section" *ngIf="showEditStep()">
+      <div class="viewer-header">
+        <div>
+          <div class="eyebrow">{{ role | titlecase }} mode</div>
+          <h3>{{ selectedCourse?.title }}</h3>
+          <p class="muted">{{ selectedCourse?.description }}</p>
+        </div>
+        <div class="actions" *ngIf="role === 'trainer'">
+          <button class="primary" (click)="completeCourse()">Complete Course</button>
+        </div>
+      </div>
+
+      <app-viewer
+        [course]="selectedCourse"
+        [role]="role"
+        [editMode]="role === 'trainer'"
+        (tagsChange)="onTagsChange($event)"
+        (stopsChange)="onStopsChange($event)"
+        (durationChange)="onDurationChange($event)"
+      ></app-viewer>
+    </section>
+
+    <section class="empty" *ngIf="role === 'trainee' && !selectedCourse">
+      <div class="empty-box">Pick a course from the list to start a guided walkthrough.</div>
+    </section>
+  </main>
+</div>

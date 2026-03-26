@@ -1,0 +1,158 @@
+<div class="viewer-header">
+  <div>
+    <div class="course-title">{{ course?.title || 'No course selected' }}</div>
+    <div class="subtext">
+      Role: {{ role | titlecase }} · Mode: {{ editMode ? 'Edit' : 'Preview' }}
+    </div>
+  </div>
+  <div class="status">
+    <span class="pill" [class.green]="isPlaying" [class.gray]="!isPlaying">
+      {{ isPlaying ? 'Playing' : 'Paused' }}
+    </span>
+    <span class="pill">Duration: {{ animationDuration | number : '1.1-1' }}s</span>
+  </div>
+</div>
+
+<div class="viewer-shell">
+  <div #rendererHost class="renderer-host">
+    <div class="error" *ngIf="loadError">{{ loadError }}</div>
+    <div
+      *ngFor="let tag of projectedTags"
+      class="tag-badge"
+      [style.left.px]="tag.screenX"
+      [style.top.px]="tag.screenY"
+    >
+      <div class="tag-title">{{ tag.title }}</div>
+      <div class="tag-desc">{{ tag.description }}</div>
+      <div class="tag-actions">
+        <button class="ghost" (click)="playTagAudio(tag)" [disabled]="!tag.audioUrl">▶ Audio</button>
+        <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">Remove</button>
+      </div>
+    </div>
+    <div *ngIf="pendingTagPosition && editMode" class="pending-hint">Click save tag below to confirm</div>
+  </div>
+
+  <div class="panel">
+    <div class="controls-row">
+      <button class="primary" (click)="togglePlay()">{{ isPlaying ? 'Pause' : 'Play' }}</button>
+      <button class="ghost" (click)="seek(0)">⏮ Reset</button>
+      <button class="ghost" type="button" (click)="jumpToPreviousStop()" [disabled]="animationStops.length === 0">◀ Prev stop</button>
+      <button class="ghost" type="button" (click)="jumpToNextStop()" [disabled]="animationStops.length === 0">Next stop ▶</button>
+      <label class="slider">
+        <input
+          type="range"
+          min="0"
+          [max]="animationDuration || 0"
+          [step]="0.01"
+          [value]="currentTime"
+          (input)="seek($any($event.target).valueAsNumber)"
+        />
+      </label>
+      <span class="timecode">{{ currentTime | number : '1.1-2' }}s / {{ animationDuration | number : '1.1-2' }}s</span>
+    </div>
+
+    <div class="split">
+      <div class="section">
+        <div class="section-title">Timeline Stops</div>
+        <form
+          class="inline-form"
+          *ngIf="role === 'trainer' && editMode"
+          (submit)="$event.preventDefault(); addStopFromInputs(stopTime, stopLabel)"
+        >
+          <input #stopTime type="number" min="0" step="0.1" placeholder="Time (s)" />
+          <input #stopLabel type="text" placeholder="Label (optional)" />
+          <button class="ghost" type="submit">Add Stop</button>
+        </form>
+        <div class="inline-form" *ngIf="role === 'trainer' && editMode">
+          <button class="ghost" type="button" (click)="addStop(currentTime, formatStopLabel(currentTime))">
+            Add stop at {{ currentTime | number : '1.1-2' }}s
+          </button>
+        </div>
+        <div class="chip-list">
+          <div class="chip" *ngFor="let stop of animationStops">
+            <span>{{ stop.label || 'Stop' }} &#64; {{ stop.time | number : '1.1-2' }}s</span>
+            <button
+              *ngIf="role === 'trainer' && editMode"
+              class="ghost danger"
+              (click)="removeStop(stop.id)"
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+          <div *ngIf="animationStops.length === 0" class="muted">No stops yet.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Tags</div>
+        <div class="muted" *ngIf="role === 'trainer' && editMode">Click the model to pick a tag position.</div>
+
+        <div *ngIf="pendingTagPosition && editMode" class="tag-form">
+          <div class="muted">Position locked. Add details to save.</div>
+          <label>Title <input #tagTitle type="text" required /></label>
+          <label>Description <textarea #tagDesc rows="2"></textarea></label>
+          <label>Audio (optional) <input #audioFile type="file" accept="audio/*" /></label>
+          <label class="inline-visibility">
+            <input #visibleAll type="checkbox" /> Visible throughout animation
+          </label>
+          <div class="visibility-range">
+            <label>
+              Visible from (s)
+              <input #visibleFrom type="number" [disabled]="visibleAll.checked" step="0.1" [value]="currentTime" />
+            </label>
+            <label>
+              Visible to (s)
+              <input #visibleTo type="number" [disabled]="visibleAll.checked" step="0.1" [value]="animationDuration || currentTime" />
+            </label>
+          </div>
+          <div class="muted small">Tag will show between the times above unless "Visible throughout" is checked.</div>
+          <div class="muted small">Current time: {{ currentTime | number : '1.1-2' }}s</div>
+          <div class="actions">
+            <button
+              class="primary"
+              type="button"
+              (click)="
+                addTagFromForm({
+                  title: tagTitle.value,
+                  description: tagDesc.value,
+                  audioFile: audioFile.files?.[0],
+                  visibleFrom: visibleFrom.value ? visibleFrom.valueAsNumber : undefined,
+                  visibleTo: visibleTo.value ? visibleTo.valueAsNumber : undefined,
+                  alwaysVisible: visibleAll.checked
+                })
+              "
+            >
+              Save Tag
+            </button>
+            <button class="ghost" type="button" (click)="pendingTagPosition = null">Cancel</button>
+          </div>
+        </div>
+
+        <div class="tag-list">
+          <div class="tag-item" *ngFor="let tag of tags">
+            <div>
+              <div class="tag-title">{{ tag.title }}</div>
+              <div class="tag-desc small">{{ tag.description }}</div>
+              <div class="meta small">
+                Visible:
+                {{
+                  tag.alwaysVisible
+                    ? 'Entire animation'
+                    : ((tag.visibleFrom || 0) | number : '1.1-2') + 's \u2192 ' + ((tag.visibleTo || animationDuration) | number : '1.1-2') + 's'
+                }}
+              </div>
+            </div>
+            <div class="actions">
+              <button class="ghost" (click)="playTagAudio(tag)" [disabled]="!tag.audioUrl">Play audio</button>
+              <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">
+                Remove
+              </button>
+            </div>
+          </div>
+          <div *ngIf="tags.length === 0" class="muted">No tags added.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
