@@ -69,7 +69,7 @@
       <div class="card">
         <div class="card-title">My Courses</div>
         <div class="course-list">
-          <div class="course-row" *ngFor="let course of courses" [class.active]="course.id === selectedCourse?.id">
+          <div class="course-row" *ngFor="let course of getVisibleCourses()" [class.active]="course.id === selectedCourse?.id">
             <div>
               <div class="title">{{ course.title }}</div>
               <div class="meta">{{ course.description }}</div>

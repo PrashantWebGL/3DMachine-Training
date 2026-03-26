@@ -6,7 +6,7 @@ export interface Tag3D {
   description: string;
   audioUrl?: string;
   position: { x: number; y: number; z: number };
-  /**
+  /** 
    * If set, tag is visible only between these times (seconds) unless alwaysVisible is true.
    * Defaults to full animation range.
    */
@@ -14,6 +14,8 @@ export interface Tag3D {
   visibleTo?: number;
   /** Flag to pin the tag for the entire animation. */
   alwaysVisible?: boolean;
+  /** When true, tag overlay is hidden (not rendered) without deleting the tag. */
+  hidden?: boolean;
 }
 
 export interface AnimationStop {

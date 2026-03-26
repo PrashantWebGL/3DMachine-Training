@@ -176,6 +176,7 @@ export class AppComponent implements OnInit {
     this.refreshCourses();
     this.trainerTab = 'my-courses';
     this.trainerStep = 'edit';
+    this.view = 'trainer'; // ensure the shell shows My Courses after completion
   }
 
   showUploadStep(): boolean {
@@ -193,6 +194,10 @@ export class AppComponent implements OnInit {
     this.storage.upsert(this.selectedCourse);
     this.refreshCourses();
     this.trainerStep = 'edit';
+  }
+
+  getVisibleCourses(): Course[] {
+    return this.selectedCourse ? [this.selectedCourse] : this.courses;
   }
 
   useLibraryModel(model: LibraryModel): void {

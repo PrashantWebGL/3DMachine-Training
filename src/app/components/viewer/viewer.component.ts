@@ -67,6 +67,18 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private autoPlacedInAR = false;
   private arPlacementPending = false;
   private modelBaseYOffset = 0;
+  xrPresenting = false;
+
+  // recording
+  isRecording = false;
+  recordedAudioUrl: string | null = null;
+  private mediaRecorder: MediaRecorder | null = null;
+  private recordedChunks: BlobPart[] = [];
+  recordError = '';
+
+  // stop navigation state
+  private navigationTarget: number | null = null;
+  private navigationDirection: 'forward' | 'backward' | null = null;
 
   constructor(private cdr: ChangeDetectorRef) {}
   private isInitialized = false;
@@ -214,6 +226,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     this.renderer.xr.addEventListener('sessionstart', (event) => {
       this.onXRSessionStart(event);
+      this.xrPresenting = true;
+      this.cdr.markForCheck();
     });
 
     this.renderer.xr.addEventListener('sessionend', () => {
@@ -222,6 +236,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       if (this.reticle) {
         this.scene.remove(this.reticle);
       }
+      this.xrPresenting = false;
+      this.cdr.markForCheck();
     });
   }
 
@@ -248,6 +264,9 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (!xrSession) return;
     const session: XRSession = xrSession;
     this.autoPlacedInAR = false;
+    this.arPlacementPending = true;
+    this.xrPresenting = true;
+    this.cdr.markForCheck();
 
     session.requestReferenceSpace('local').then((refSpace: XRReferenceSpace) => {
       this.xrReferenceSpace = refSpace;
@@ -277,6 +296,13 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     session.addEventListener('select', onSelect);
     session.addEventListener('end', () => {
       session.removeEventListener('select', onSelect);
+      this.autoPlacedInAR = false;
+      this.arPlacementPending = false;
+      this.xrPresenting = false;
+      if (this.model) {
+        this.placeModelOnGround(0);
+      }
+      this.cdr.markForCheck();
     });
   }
 
@@ -286,15 +312,15 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         const now = performance.now();
         const delta = (now - this.lastFrameTime) / 1000;
         this.lastFrameTime = now;
-        if (this.model && this.isLoading) {
-          this.isLoading = false;
-          this.loadingProgress = 100;
-          this.cdr.markForCheck();
-        }
-        if (this.mixer && this.isPlaying) {
-          this.mixer.update(delta);
-          this.checkStopPoints();
-        }
+    if (this.model && this.isLoading) {
+      this.isLoading = false;
+      this.loadingProgress = 100;
+      this.cdr.markForCheck();
+    }
+      if (this.mixer && this.isPlaying) {
+        this.mixer.update(delta);
+        this.checkNavigationTarget();
+      }
 
         this.currentTime = this.activeAction ? this.activeAction.time : 0;
         this.updateTagsScreenPositions();
@@ -416,7 +442,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         this.mixer = new THREE.AnimationMixer(model);
         this.mixer.stopAllAction();
         this.activeAction = this.mixer.clipAction(gltf.animations[0]);
-        this.activeAction.clampWhenFinished = true;
+        this.activeAction.clampWhenFinished = false;
+        this.activeAction.setLoop(THREE.LoopRepeat, Infinity);
         this.activeAction.enabled = true;
         this.activeAction.setEffectiveWeight(1);
         this.activeAction.setEffectiveTimeScale(1);
@@ -512,14 +539,23 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.controls.update();
   }
 
-  private checkStopPoints(): void {
-    if (!this.activeAction || this.animationStops.length === 0) return;
-    const currentTime = this.activeAction.time;
-    const stopsSorted = [...this.animationStops].sort((a, b) => a.time - b.time);
-    const nextStop = stopsSorted[this.nextStopIndex];
-    if (nextStop && currentTime >= nextStop.time) {
+  checkNavigationTarget(): void {
+    if (!this.activeAction || this.navigationTarget === null || !this.navigationDirection) return;
+    const t = this.activeAction.time;
+    const epsilon = 0.0001;
+    if (this.navigationDirection === 'forward' && t >= this.navigationTarget - epsilon) {
+      const target = this.navigationTarget ?? t;
+      this.navigationTarget = null;
+      this.navigationDirection = null;
+      this.seek(target);
       this.pause();
-      this.nextStopIndex = Math.min(this.nextStopIndex + 1, stopsSorted.length - 1);
+    }
+    if (this.navigationDirection === 'backward' && this.navigationTarget !== null && t <= this.navigationTarget + epsilon) {
+      const target = this.navigationTarget;
+      this.navigationTarget = null;
+      this.navigationDirection = null;
+      this.seek(target ?? t);
+      this.pause();
     }
   }
 
@@ -536,6 +572,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private shouldDisplayTag(tag: Tag3D): boolean {
+    if (tag.hidden) return false;
     if (tag.alwaysVisible) return true;
     if (!this.activeAction) return true;
     const start = tag.visibleFrom ?? 0;
@@ -548,6 +585,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     title: string;
     description: string;
     audioFile?: File | null;
+    audioUrl?: string | null;
     visibleFrom?: number;
     visibleTo?: number;
     alwaysVisible?: boolean;
@@ -555,7 +593,9 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (!this.pendingTagPosition || !this.course) return;
     const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
     let audioUrl: string | undefined;
-    if (form.audioFile) {
+    if (form.audioUrl) {
+      audioUrl = form.audioUrl;
+    } else if (form.audioFile) {
       audioUrl = URL.createObjectURL(form.audioFile);
     }
     const defaultStart = this.currentTime || 0;
@@ -591,6 +631,12 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (!tag.audioUrl) return;
     const audio = new Audio(tag.audioUrl);
     audio.play();
+  }
+
+  hideTag(id: string): void {
+    this.tags = this.tags.map((t) => (t.id === id ? { ...t, hidden: true } : t));
+    this.tagsChange.emit(this.tags);
+    this.updateTagsScreenPositions();
   }
 
   addStop(time: number, label?: string): void {
@@ -646,9 +692,11 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   play(): void {
     if (!this.activeAction) return;
-    this.activeAction.reset();
+    this.navigationTarget = null;
+    this.navigationDirection = null;
     this.activeAction.paused = false;
     this.activeAction.play();
+    this.activeAction.setEffectiveTimeScale(1);
     this.isPlaying = true;
     this.cdr.markForCheck();
   }
@@ -666,14 +714,10 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const current = this.activeAction.time;
     const next = sorted.find((s) => s.time > current + 0.001);
     if (next) {
-      this.seek(current); // ensure we start from exact current time
       this.nextStopIndex = sorted.findIndex((s) => s.id === next.id);
-      this.play();
+      this.startNavigation(next.time, 'forward');
     } else {
-      // loop back to first stop
-      this.seek(sorted[0].time);
-      this.nextStopIndex = 0;
-      this.play();
+      // already at or past last stop; do nothing
     }
   }
 
@@ -683,13 +727,11 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const current = this.activeAction.time;
     const prev = [...sorted].reverse().find((s) => s.time < current - 0.001);
     if (prev) {
-      this.seek(prev.time);
-      this.nextStopIndex = sorted.findIndex((s) => s.id === prev.id);
-      this.pause();
+      const idx = sorted.findIndex((s) => s.id === prev.id);
+      this.nextStopIndex = Math.min(idx + 1, sorted.length - 1);
+      this.startNavigation(prev.time, 'backward');
     } else {
-      this.seek(sorted[sorted.length - 1].time);
-      this.nextStopIndex = sorted.length - 1;
-      this.pause();
+      // at first stop, stay put
     }
   }
 
@@ -701,5 +743,55 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     }
     const idx = sorted.findIndex((s) => s.time >= currentTime);
     this.nextStopIndex = idx >= 0 ? idx : sorted.length - 1;
+  }
+
+  private startNavigation(target: number, direction: 'forward' | 'backward'): void {
+    if (!this.activeAction) return;
+    this.navigationTarget = target;
+    this.navigationDirection = direction;
+    const speed = direction === 'forward' ? 1 : -1;
+    this.activeAction.setEffectiveTimeScale(speed);
+    this.activeAction.paused = false;
+    this.activeAction.play();
+    this.isPlaying = true;
+    this.cdr.markForCheck();
+  }
+
+  startRecording(): void {
+    this.recordError = '';
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.recordError = 'Recording not supported on this device.';
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        this.recordedChunks = [];
+        this.mediaRecorder = new MediaRecorder(stream);
+        this.mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) this.recordedChunks.push(e.data);
+        };
+        this.mediaRecorder.onstop = () => {
+          const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+          this.recordedAudioUrl = URL.createObjectURL(blob);
+          stream.getTracks().forEach((t) => t.stop());
+          this.isRecording = false;
+          this.cdr.markForCheck();
+        };
+        this.mediaRecorder.start();
+        this.isRecording = true;
+        this.cdr.markForCheck();
+      })
+      .catch((err) => {
+        this.recordError = err?.message || 'Unable to start recording.';
+        this.isRecording = false;
+        this.cdr.markForCheck();
+      });
+  }
+
+  stopRecording(): void {
+    if (this.mediaRecorder && this.isRecording) {
+      this.mediaRecorder.stop();
+    }
   }
 }

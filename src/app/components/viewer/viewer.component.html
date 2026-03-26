@@ -22,10 +22,11 @@
       [style.left.px]="tag.screenX"
       [style.top.px]="tag.screenY"
     >
+      <button class="tag-close" (click)="hideTag(tag.id)" title="Hide tag">✕</button>
       <div class="tag-title">{{ tag.title }}</div>
       <div class="tag-desc">{{ tag.description }}</div>
       <div class="tag-actions">
-        <button class="ghost" (click)="playTagAudio(tag)" [disabled]="!tag.audioUrl">▶ Audio</button>
+        <button *ngIf="tag.audioUrl" class="ghost" (click)="playTagAudio(tag)">▶ Audio</button>
         <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">Remove</button>
       </div>
     </div>
@@ -49,6 +50,9 @@
         />
       </label>
       <span class="timecode">{{ currentTime | number : '1.1-2' }}s / {{ animationDuration | number : '1.1-2' }}s</span>
+    </div>
+    <div class="ar-overlay-controls" *ngIf="xrPresenting">
+      <button class="primary" (click)="togglePlay()">{{ isPlaying ? 'Pause' : 'Play' }} (AR)</button>
     </div>
 
     <div class="split">
@@ -93,6 +97,13 @@
           <label>Title <input #tagTitle type="text" required /></label>
           <label>Description <textarea #tagDesc rows="2"></textarea></label>
           <label>Audio (optional) <input #audioFile type="file" accept="audio/*" /></label>
+          <div class="record-row">
+            <button type="button" class="ghost" (click)="isRecording ? stopRecording() : startRecording()">
+              {{ isRecording ? 'Stop Recording' : 'Record Audio' }}
+            </button>
+            <span class="muted small" *ngIf="recordedAudioUrl && !isRecording">Recorded clip ready</span>
+            <span class="muted small danger" *ngIf="recordError">{{ recordError }}</span>
+          </div>
           <label class="inline-visibility">
             <input #visibleAll type="checkbox" /> Visible throughout animation
           </label>
@@ -117,6 +128,7 @@
                   title: tagTitle.value,
                   description: tagDesc.value,
                   audioFile: audioFile.files?.[0],
+                  audioUrl: recordedAudioUrl,
                   visibleFrom: visibleFrom.value ? visibleFrom.valueAsNumber : undefined,
                   visibleTo: visibleTo.value ? visibleTo.valueAsNumber : undefined,
                   alwaysVisible: visibleAll.checked
@@ -144,7 +156,7 @@
               </div>
             </div>
             <div class="actions">
-              <button class="ghost" (click)="playTagAudio(tag)" [disabled]="!tag.audioUrl">Play audio</button>
+              <button *ngIf="tag.audioUrl" class="ghost" (click)="playTagAudio(tag)">Play audio</button>
               <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">
                 Remove
               </button>
