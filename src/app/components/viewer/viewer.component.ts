@@ -79,6 +79,12 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   // stop navigation state
   private navigationTarget: number | null = null;
   private navigationDirection: 'forward' | 'backward' | null = null;
+  // Pinch zoom
+  private pinchStartDist = 0;
+  private pinchBaseScale = 1;
+  private pinchTargetScale = 1;
+  private pinchSmooth = 0.15;
+  private pinchListenerCleanup: (() => void) | null = null;
 
   constructor(private cdr: ChangeDetectorRef) {}
   private isInitialized = false;
@@ -138,6 +144,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.renderer.setAnimationLoop(null);
     this.renderer.dispose();
     this.controls?.dispose();
+    this.teardownPinchZoom();
   }
 
   private initThree(): void {
@@ -176,6 +183,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     this.setupXRButtons();
     this.setupPointerHandler();
+    this.setupPinchZoom();
   }
 
   private addLights(): void {
@@ -316,11 +324,12 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.loadingProgress = 100;
       this.cdr.markForCheck();
     }
-      if (this.mixer && this.isPlaying) {
-        this.mixer.update(delta);
-        this.checkNavigationTarget();
-      }
+        if (this.mixer && this.isPlaying) {
+          this.mixer.update(delta);
+          this.checkNavigationTarget();
+        }
 
+        this.updatePinchZoom();
         this.currentTime = this.activeAction ? this.activeAction.time : 0;
         this.updateTagsScreenPositions();
         this.controls?.update();
@@ -751,6 +760,59 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.activeAction.play();
     this.isPlaying = true;
     this.cdr.markForCheck();
+  }
+
+  private setupPinchZoom(): void {
+    const dom = this.renderer?.domElement;
+    if (!dom) return;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2 && this.model) {
+        this.pinchStartDist = this.getTouchDistance(e);
+        this.pinchBaseScale = this.model.scale.x;
+        this.pinchTargetScale = this.pinchBaseScale;
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !this.model || !this.pinchStartDist) return;
+      e.preventDefault();
+      const dist = this.getTouchDistance(e);
+      const factor = dist / this.pinchStartDist;
+      const next = THREE.MathUtils.clamp(this.pinchBaseScale * factor, 0.2, 5);
+      this.pinchTargetScale = next;
+    };
+    const onTouchEnd = () => {
+      this.pinchStartDist = 0;
+    };
+    dom.addEventListener('touchstart', onTouchStart, { passive: false });
+    dom.addEventListener('touchmove', onTouchMove, { passive: false });
+    dom.addEventListener('touchend', onTouchEnd);
+    dom.addEventListener('touchcancel', onTouchEnd);
+    this.pinchListenerCleanup = () => {
+      dom.removeEventListener('touchstart', onTouchStart);
+      dom.removeEventListener('touchmove', onTouchMove);
+      dom.removeEventListener('touchend', onTouchEnd);
+      dom.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }
+
+  private teardownPinchZoom(): void {
+    this.pinchListenerCleanup?.();
+    this.pinchListenerCleanup = null;
+  }
+
+  private getTouchDistance(e: TouchEvent): number {
+    if (e.touches.length < 2) return 0;
+    const [t0, t1] = [e.touches[0], e.touches[1]];
+    const dx = t0.clientX - t1.clientX;
+    const dy = t0.clientY - t1.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  private updatePinchZoom(): void {
+    if (!this.model) return;
+    const current = this.model.scale.x;
+    const next = THREE.MathUtils.lerp(current, this.pinchTargetScale, this.pinchSmooth);
+    this.model.scale.setScalar(next);
   }
 
   startRecording(): void {
