@@ -65,6 +65,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private reticle: THREE.Mesh | null = null;
   private dracoLoader: DRACOLoader | null = null;
   private autoPlacedInAR = false;
+  private arPlacementPending = false;
   private modelBaseYOffset = 0;
 
   constructor(private cdr: ChangeDetectorRef) {}
@@ -193,6 +194,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private placeModelOnGround(y: number): void {
     if (!this.model) return;
     this.model.position.y = y + this.modelBaseYOffset;
+    this.model.position.x = this.model.position.x || 0;
+    this.model.position.z = this.model.position.z || 0;
     this.model.updateMatrixWorld(true);
   }
 
@@ -267,6 +270,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const onSelect = () => {
       if (this.reticle?.visible) {
         this.placeModelOnGround(this.reticle.position.y);
+        this.autoPlacedInAR = true;
+        this.arPlacementPending = false;
       }
     };
     session.addEventListener('select', onSelect);
@@ -303,9 +308,10 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
             this.reticle.visible = true;
             this.reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
             this.reticle.updateMatrixWorld(true);
-            if (!this.autoPlacedInAR) {
+            if (!this.autoPlacedInAR || this.arPlacementPending) {
               this.placeModelOnGround(this.reticle.position.y);
               this.autoPlacedInAR = true;
+              this.arPlacementPending = false;
             }
           }
         }
@@ -364,6 +370,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.isLoading = true;
     this.loadingProgress = 0;
     this.loadError = '';
+    this.arPlacementPending = true;
     this.disposeCurrentModel();
     this.tags = [...course.tags];
     this.animationStops = this.sanitizeStops(course.animationStops);
@@ -394,6 +401,10 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       model.userData.isCourseModel = true;
       this.clearExistingCourseModels();
       this.scene.add(model);
+      if (this.renderer.xr.isPresenting) {
+        // Keep it out of view until AR surface is detected
+        this.model.position.set(0, -1000, 0);
+      }
 
       try {
         this.frameCameraToObject(model);
