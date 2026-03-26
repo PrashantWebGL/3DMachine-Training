@@ -205,9 +205,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private placeModelOnGround(y: number): void {
     if (!this.model) return;
-    this.model.position.y = y + this.modelBaseYOffset;
-    this.model.position.x = this.model.position.x || 0;
-    this.model.position.z = this.model.position.z || 0;
+    // Always keep model at the scene origin
+    this.model.position.set(0, 0, 0);
     this.model.updateMatrixWorld(true);
   }
 
@@ -427,10 +426,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       model.userData.isCourseModel = true;
       this.clearExistingCourseModels();
       this.scene.add(model);
-      if (this.renderer.xr.isPresenting) {
-        // Keep it out of view until AR surface is detected
-        model.position.set(0, -1000, 0);
-      }
+      model.position.set(0, 0, 0);
 
       try {
         this.frameCameraToObject(model);
