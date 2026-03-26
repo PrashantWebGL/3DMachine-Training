@@ -64,6 +64,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private xrReferenceSpace: XRReferenceSpace | null = null;
   private reticle: THREE.Mesh | null = null;
   private dracoLoader: DRACOLoader | null = null;
+  private autoPlacedInAR = false;
+  private modelBaseYOffset = 0;
 
   constructor(private cdr: ChangeDetectorRef) {}
   private isInitialized = false;
@@ -188,6 +190,12 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     removable.forEach((child) => this.scene.remove(child));
   }
 
+  private placeModelOnGround(y: number): void {
+    if (!this.model) return;
+    this.model.position.y = y + this.modelBaseYOffset;
+    this.model.updateMatrixWorld(true);
+  }
+
   private setupXRButtons(): void {
     const vrButton = VRButton.createButton(this.renderer);
     vrButton.classList.add('xr-button');
@@ -236,6 +244,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const xrSession = this.renderer.xr.getSession();
     if (!xrSession) return;
     const session: XRSession = xrSession;
+    this.autoPlacedInAR = false;
 
     session.requestReferenceSpace('local').then((refSpace: XRReferenceSpace) => {
       this.xrReferenceSpace = refSpace;
@@ -254,6 +263,16 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     );
     this.reticle.visible = false;
     this.scene.add(this.reticle);
+
+    const onSelect = () => {
+      if (this.reticle?.visible) {
+        this.placeModelOnGround(this.reticle.position.y);
+      }
+    };
+    session.addEventListener('select', onSelect);
+    session.addEventListener('end', () => {
+      session.removeEventListener('select', onSelect);
+    });
   }
 
   private startRenderLoop(): void {
@@ -276,17 +295,21 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         this.updateTagsScreenPositions();
         this.controls?.update();
 
-        if (frame && this.xrHitTestSource && this.xrReferenceSpace) {
-          const hitTestResults = frame.getHitTestResults(this.xrHitTestSource);
-          if (hitTestResults.length > 0 && this.reticle) {
-            const pose = hitTestResults[0].getPose(this.xrReferenceSpace);
-            if (pose) {
-              this.reticle.visible = true;
-              this.reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-              this.reticle.updateMatrixWorld(true);
+      if (frame && this.xrHitTestSource && this.xrReferenceSpace) {
+        const hitTestResults = frame.getHitTestResults(this.xrHitTestSource);
+        if (hitTestResults.length > 0 && this.reticle) {
+          const pose = hitTestResults[0].getPose(this.xrReferenceSpace);
+          if (pose) {
+            this.reticle.visible = true;
+            this.reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+            this.reticle.updateMatrixWorld(true);
+            if (!this.autoPlacedInAR) {
+              this.placeModelOnGround(this.reticle.position.y);
+              this.autoPlacedInAR = true;
             }
           }
         }
+      }
 
         this.renderer.render(this.scene, this.camera);
 
@@ -366,6 +389,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         }
       });
       this.normalizeAndCenter(model);
+      const box = new THREE.Box3().setFromObject(model);
+      this.modelBaseYOffset = -box.min.y;
       model.userData.isCourseModel = true;
       this.clearExistingCourseModels();
       this.scene.add(model);
