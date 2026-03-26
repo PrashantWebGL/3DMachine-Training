@@ -51,7 +51,8 @@
         <div class="library">
           <div class="library-header">Or choose a bundled model</div>
           <div class="library-grid">
-            <button class="library-card" type="button" *ngFor="let model of libraryModels" (click)="useLibraryModel(model)">
+            <button class="library-card" type="button" *ngFor="let model of libraryModels"
+              (click)="useLibraryModel(model)">
               <img [src]="model.imagePath" [alt]="model.name" />
               <div class="library-meta">
                 <div class="title">{{ model.name }}</div>
@@ -68,11 +69,7 @@
       <div class="card">
         <div class="card-title">My Courses</div>
         <div class="course-list">
-          <div
-            class="course-row"
-            *ngFor="let course of courses"
-            [class.active]="course.id === selectedCourse?.id"
-          >
+          <div class="course-row" *ngFor="let course of courses" [class.active]="course.id === selectedCourse?.id">
             <div>
               <div class="title">{{ course.title }}</div>
               <div class="meta">{{ course.description }}</div>
@@ -85,12 +82,8 @@
               <button class="ghost" (click)="selectCourse(course)">
                 {{ role === 'trainer' ? 'Edit/Preview' : 'Open' }}
               </button>
-              <button
-                class="ghost danger"
-                *ngIf="role === 'trainer'"
-                (click)="deleteCourse(course.id)"
-                [disabled]="course.id === 'starter-course'"
-              >
+              <button class="ghost danger" *ngIf="role === 'trainer'" (click)="deleteCourse(course.id)"
+                [disabled]="course.id === 'starter-course'">
                 Delete
               </button>
             </div>
@@ -104,12 +97,8 @@
               <button class="ghost" type="button" (click)="applySampleModel('assets/models/delta_robot_irb_390.glb')">
                 Use Delta Robot
               </button>
-              <button
-                class="ghost"
-                type="button"
-                (click)="applySampleModel('assets/models/boka_manipulator.glb')"
-              >
-                Use Boka Manipulator
+              <button class="ghost" type="button" (click)="applySampleModel('assets/models/kuka_robot_arm.glb')">
+                Use Kuka Manipulator
               </button>
             </div>
           </div>
@@ -129,14 +118,9 @@
         </div>
       </div>
 
-      <app-viewer
-        [course]="selectedCourse"
-        [role]="role"
-        [editMode]="role === 'trainer'"
-        (tagsChange)="onTagsChange($event)"
-        (stopsChange)="onStopsChange($event)"
-        (durationChange)="onDurationChange($event)"
-      ></app-viewer>
+      <app-viewer [course]="selectedCourse" [role]="role" [editMode]="role === 'trainer'"
+        (tagsChange)="onTagsChange($event)" (stopsChange)="onStopsChange($event)"
+        (durationChange)="onDurationChange($event)"></app-viewer>
     </section>
 
     <section class="empty" *ngIf="role === 'trainee' && !selectedCourse">

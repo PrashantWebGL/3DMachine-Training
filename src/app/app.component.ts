@@ -46,15 +46,15 @@ export class AppComponent implements OnInit {
       imagePath: 'assets/thumbnails/delta_robot_irb_390.png',
     },
     {
-      id: 'boka_manipulator',
-      name: 'Boka Manipulator',
+      id: 'kuka_robot_arm',
+      name: 'Kuka Robot Arm',
       description: 'Collaborative-style manipulator with multi-step path.',
-      glbPath: 'assets/models/boka_manipulator.glb',
-      imagePath: 'assets/thumbnails/boka_manipulator.png',
+      glbPath: 'assets/models/kuka_robot_arm.glb',
+      imagePath: 'assets/thumbnails/Kuka_manipulator.png',
     },
   ];
 
-  constructor(private storage: CourseStorageService) {}
+  constructor(private storage: CourseStorageService) { }
 
   ngOnInit(): void {
     this.courses = this.storage.getAll();
