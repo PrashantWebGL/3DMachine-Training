@@ -339,10 +339,14 @@ textarea:focus {
 }
 
 .ar-overlay-controls {
-  position: absolute;
+  position: fixed;
   left: 12px;
   bottom: 12px;
-  z-index: 12;
+  z-index: 9999;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  pointer-events: auto;
 }
 
 @media (max-width: 1024px) {

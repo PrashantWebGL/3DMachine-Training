@@ -198,12 +198,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private addReferenceHelpers(): void {
-    const grid = new THREE.GridHelper(10, 20, 0xa3baff, 0xe5eafe);
-    grid.position.y = 0;
-    this.scene.add(grid);
-
-    const axes = new THREE.AxesHelper(2);
-    this.scene.add(axes);
+    // Grid and axes helpers disabled per request
   }
 
   private clearExistingCourseModels(): void {
