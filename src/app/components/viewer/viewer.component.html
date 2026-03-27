@@ -53,6 +53,9 @@
     </div>
     <div class="ar-overlay-controls" *ngIf="xrPresenting">
       <button class="primary" (click)="togglePlay()">{{ isPlaying ? 'Pause' : 'Play' }} (AR)</button>
+      <button class="ghost" type="button" (click)="jumpToPreviousStop()" [disabled]="animationStops.length === 0">◀ Prev</button>
+      <button class="ghost" type="button" (click)="jumpToNextStop()" [disabled]="animationStops.length === 0">Next ▶</button>
+      <button class="ghost" type="button" (click)="seek(0)">⏮ Reset</button>
     </div>
 
     <div class="split">

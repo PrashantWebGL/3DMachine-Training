@@ -68,6 +68,17 @@
     <section class="cards" *ngIf="trainerTab === 'my-courses'">
       <div class="card">
         <div class="card-title">My Courses</div>
+        <div class="row-actions wrap">
+          <button class="ghost" type="button" (click)="exportCourses()" [disabled]="exporting">
+            {{ exporting ? 'Exporting…' : 'Export JSON' }}
+          </button>
+          <label class="ghost file-import">
+            Import JSON
+            <input type="file" accept="application/json" (change)="importCourses($event)" />
+          </label>
+          <button class="ghost" type="button" (click)="chooseProjectFile()">Link project file</button>
+          <button class="ghost" type="button" (click)="saveToLinkedFile()">Save to linked file</button>
+        </div>
         <div class="course-list">
           <div class="course-row" *ngFor="let course of getVisibleCourses()" [class.active]="course.id === selectedCourse?.id">
             <div>

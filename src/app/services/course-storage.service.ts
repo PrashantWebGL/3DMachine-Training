@@ -32,6 +32,11 @@ export class CourseStorageService {
     this.persist();
   }
 
+  replaceAll(courses: Course[]): void {
+    this.courses = [...courses];
+    this.persist();
+  }
+
   private load(): void {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (raw) {

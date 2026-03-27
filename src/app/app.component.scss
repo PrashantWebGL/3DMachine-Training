@@ -259,6 +259,18 @@ nav {
   flex-wrap: wrap;
 }
 
+.file-import {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-import input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .viewer-section {
   background: white;
   border-radius: 16px;
