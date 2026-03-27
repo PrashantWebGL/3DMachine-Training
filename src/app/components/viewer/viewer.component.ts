@@ -436,6 +436,9 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.clearExistingCourseModels();
       this.scene.add(model);
       model.position.set(0, 0, 0);
+      // Reset pinch targets to the new normalized scale
+      this.pinchBaseScale = model.scale.x;
+      this.pinchTargetScale = model.scale.x;
 
       try {
         this.frameCameraToObject(model);
@@ -512,7 +515,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     // Avoid zero-size boxes
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-    const targetSize = 1; // world units – make all models roughly 1x1x1
+    // In AR, 1 unit = 1 meter; use a smaller target to avoid filling the screen.
+    const targetSize = this.renderer?.xr?.isPresenting ? 0.2 : 1; // meters when in AR
     const scale = targetSize / maxDim;
 
     object.position.sub(center); // center to origin
