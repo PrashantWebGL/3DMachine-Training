@@ -86,7 +86,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private pinchSmooth = 0.15;
   private pinchListenerCleanup: (() => void) | null = null;
 
-  constructor(private cdr: ChangeDetectorRef) {}
+  constructor(private cdr: ChangeDetectorRef) { }
   private isInitialized = false;
 
   ngAfterViewInit(): void {
@@ -319,11 +319,11 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         const now = performance.now();
         const delta = (now - this.lastFrameTime) / 1000;
         this.lastFrameTime = now;
-    if (this.model && this.isLoading) {
-      this.isLoading = false;
-      this.loadingProgress = 100;
-      this.cdr.markForCheck();
-    }
+        if (this.model && this.isLoading) {
+          this.isLoading = false;
+          this.loadingProgress = 100;
+          this.cdr.markForCheck();
+        }
         if (this.mixer && this.isPlaying) {
           this.mixer.update(delta);
           this.checkNavigationTarget();
@@ -334,22 +334,22 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
         this.updateTagsScreenPositions();
         this.controls?.update();
 
-      if (frame && this.xrHitTestSource && this.xrReferenceSpace) {
-        const hitTestResults = frame.getHitTestResults(this.xrHitTestSource);
-        if (hitTestResults.length > 0 && this.reticle) {
-          const pose = hitTestResults[0].getPose(this.xrReferenceSpace);
-          if (pose) {
-            this.reticle.visible = true;
-            this.reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-            this.reticle.updateMatrixWorld(true);
-            if (!this.autoPlacedInAR || this.arPlacementPending) {
-              this.placeModelOnGround(this.reticle.position.y);
-              this.autoPlacedInAR = true;
-              this.arPlacementPending = false;
+        if (frame && this.xrHitTestSource && this.xrReferenceSpace) {
+          const hitTestResults = frame.getHitTestResults(this.xrHitTestSource);
+          if (hitTestResults.length > 0 && this.reticle) {
+            const pose = hitTestResults[0].getPose(this.xrReferenceSpace);
+            if (pose) {
+              this.reticle.visible = true;
+              this.reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+              this.reticle.updateMatrixWorld(true);
+              if (!this.autoPlacedInAR || this.arPlacementPending) {
+                this.placeModelOnGround(this.reticle.position.y);
+                this.autoPlacedInAR = true;
+                this.arPlacementPending = false;
+              }
             }
           }
         }
-      }
 
         this.renderer.render(this.scene, this.camera);
 
@@ -512,7 +512,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     // Avoid zero-size boxes
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-    const targetSize = 3; // world units
+    const targetSize = 1; // world units – make all models roughly 1x1x1
     const scale = targetSize / maxDim;
 
     object.position.sub(center); // center to origin
