@@ -6,6 +6,7 @@
       <button class="primary" (click)="openRole('trainer')">Trainer</button>
       <button class="ghost" (click)="openRole('trainee')">Trainee</button>
     </div>
+    <p class="muted">Version 1.0.0</p>
   </div>
 </div>
 
@@ -80,7 +81,8 @@
           <button class="ghost" type="button" (click)="saveToLinkedFile()">Save to linked file</button>
         </div>
         <div class="course-list">
-          <div class="course-row" *ngFor="let course of getVisibleCourses()" [class.active]="course.id === selectedCourse?.id">
+          <div class="course-row" *ngFor="let course of getVisibleCourses()"
+            [class.active]="course.id === selectedCourse?.id">
             <div>
               <div class="title">{{ course.title }}</div>
               <div class="meta">{{ course.description }}</div>
