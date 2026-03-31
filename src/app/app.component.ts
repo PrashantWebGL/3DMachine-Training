@@ -63,6 +63,7 @@ export class AppComponent implements OnInit {
     if (this.courses.length === 0) {
       this.seedDefaultCourse();
     }
+    this.selectedCourse = this.courses[0] || null;
   }
 
   private seedDefaultCourse(): void {
@@ -327,7 +328,13 @@ export class AppComponent implements OnInit {
   }
 
   private refreshCourses(): void {
+    const prevId = this.selectedCourse?.id;
     this.courses = this.storage.getAll();
+    if (prevId) {
+      this.selectedCourse = this.courses.find((c) => c.id === prevId) || this.courses[0] || null;
+    } else {
+      this.selectedCourse = this.courses[0] || null;
+    }
   }
 
   private async serializeCourse(course: Course): Promise<any> {

@@ -531,8 +531,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     // Avoid zero-size boxes
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-    // In AR, 1 unit = 1 meter; use a smaller target to avoid filling the screen.
-    const targetSize = this.renderer?.xr?.isPresenting ? 0.2 : 1; // meters when in AR
+    // Size to a reasonable, still-visible scale. Larger in normal view, modest in AR.
+    const targetSize = this.renderer?.xr?.isPresenting ? 0.5 : 3; // meters/world units
     const scale = targetSize / maxDim;
 
     object.position.sub(center); // center to origin
@@ -890,6 +890,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       opacity: 1.0,
     });
     this.guideMat.resolution.set(window.innerWidth, window.innerHeight);
+    // seed with two points to avoid undefined attributes
+    this.guideGeom.setPositions([0, 0, 0, 0, 0, 0]);
     this.guideLine = new Line2(this.guideGeom, this.guideMat);
     this.guideLine.computeLineDistances();
     this.guideLine.frustumCulled = false;
@@ -952,7 +954,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private updateGuideLine(): void {
     if (!this.guideLine || !this.guideGeom || !this.guideMat || !this.model || !this.camera) return;
-    const shouldShow = this.renderer.xr.isPresenting;
+    // Keep visible in both AR and normal view to help locate the model
+    const shouldShow = true;
     this.guideLine.visible = shouldShow;
     this.guideSpheres.forEach((s) => (s.visible = shouldShow));
     if (!shouldShow) return;
