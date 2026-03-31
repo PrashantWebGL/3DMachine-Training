@@ -19,7 +19,10 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { Course, Tag3D, AnimationStop, UserRole } from '../../models/course.model';
-import { CatmullRomCurve3, Line, LineBasicMaterial } from 'three';
+import { CatmullRomCurve3 } from 'three';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 @Component({
   selector: 'app-viewer',
@@ -91,8 +94,11 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   private pinchSmooth = 0.15;
   private pinchListenerCleanup: (() => void) | null = null;
   // AR guide line
-  private guideLine: Line | null = null;
-  private guideMaterial = new LineBasicMaterial({ color: 0x1e5eff, transparent: true, opacity: 0.8 });
+  private guideLine: Line2 | null = null;
+  private guideGeom: LineGeometry | null = null;
+  private guideMat: LineMaterial | null = null;
+  private guideCurve: CatmullRomCurve3 | null = null;
+  private guideSpheres: THREE.Mesh[] = [];
 
   constructor(private cdr: ChangeDetectorRef) { }
   private isInitialized = false;
@@ -153,6 +159,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.renderer.dispose();
     this.controls?.dispose();
     this.teardownPinchZoom();
+    this.teardownGuideLine();
   }
 
   private initThree(): void {
@@ -871,6 +878,50 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.pinchListenerCleanup = null;
   }
 
+  private setupGuideLine(): void {
+    this.guideGeom = new LineGeometry();
+    this.guideMat = new LineMaterial({
+      color: 0xffffff,
+      linewidth: 0.006,
+      dashed: true,
+      dashSize: 0.2,
+      gapSize: 0.1,
+      transparent: true,
+      opacity: 1.0,
+    });
+    this.guideMat.resolution.set(window.innerWidth, window.innerHeight);
+    this.guideLine = new Line2(this.guideGeom, this.guideMat);
+    this.guideLine.computeLineDistances();
+    this.guideLine.frustumCulled = false;
+    this.scene.add(this.guideLine);
+
+    // Debug spheres: start (green), mid (amber), end (red)
+    const mkSphere = (r: number, color: number) =>
+      new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), new THREE.MeshBasicMaterial({ color }));
+    this.guideSpheres = [mkSphere(0.025, 0x00ff00), mkSphere(0.02, 0xffaa00), mkSphere(0.03, 0xff0000)];
+    this.guideSpheres.forEach((s) => {
+      s.frustumCulled = false;
+      this.scene.add(s);
+    });
+  }
+
+  private teardownGuideLine(): void {
+    if (this.guideLine) {
+      this.scene.remove(this.guideLine);
+      this.guideLine.geometry.dispose();
+      (this.guideLine.material as any)?.dispose?.();
+    }
+    this.guideLine = null;
+    this.guideGeom = null;
+    this.guideMat = null;
+    this.guideSpheres.forEach((s) => {
+      this.scene.remove(s);
+      s.geometry.dispose();
+      (s.material as any)?.dispose?.();
+    });
+    this.guideSpheres = [];
+  }
+
   private getTouchDistance(e: TouchEvent): number {
     if (e.touches.length < 2) return 0;
     const [t0, t1] = [e.touches[0], e.touches[1]];
@@ -899,38 +950,38 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     return vec;
   }
 
-  private setupGuideLine(): void {
-    const geom = new THREE.BufferGeometry();
-    this.guideLine = new Line(geom, this.guideMaterial);
-    this.guideLine.visible = false;
-    this.scene.add(this.guideLine);
-  }
-
   private updateGuideLine(): void {
-    if (!this.guideLine || !this.model || !this.camera) return;
-    // Show guide mainly in AR; keep for normal view optional
+    if (!this.guideLine || !this.guideGeom || !this.guideMat || !this.model || !this.camera) return;
     const shouldShow = this.renderer.xr.isPresenting;
     this.guideLine.visible = shouldShow;
+    this.guideSpheres.forEach((s) => (s.visible = shouldShow));
     if (!shouldShow) return;
 
     const start = this.camera.getWorldPosition(new THREE.Vector3());
-    const box = new THREE.Box3().setFromObject(this.model);
-    const end = box.getCenter(new THREE.Vector3());
+    const end = new THREE.Vector3(0, 0, 0); // model at origin
     const mid = start.clone().lerp(end, 0.5);
-    const lift = Math.max(start.distanceTo(end) * 0.2, 0.1);
+    const lift = Math.max(start.distanceTo(end) * 0.25, 0.3);
     mid.y += lift;
 
-    const curve = new CatmullRomCurve3([start, mid, end]);
-    const points = curve.getPoints(40);
-    const positions = new Float32Array(points.length * 3);
-    points.forEach((p, i) => {
-      positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
-      positions[i * 3 + 2] = p.z;
-    });
+    if (!this.guideCurve) this.guideCurve = new CatmullRomCurve3();
+    this.guideCurve.points = [start, mid, end];
+    const pts = this.guideCurve.getPoints(40);
+    const positions: number[] = [];
+    pts.forEach((p) => positions.push(p.x, p.y, p.z));
+    this.guideGeom.setPositions(positions);
+    this.guideLine.computeLineDistances();
 
-    this.guideLine.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.guideLine.geometry.computeBoundingSphere();
+    // dash flow toward model
+    const t = performance.now() * 0.001;
+    this.guideMat.dashOffset = -t * 0.5;
+    this.guideMat.needsUpdate = true;
+
+    // Debug spheres
+    if (this.guideSpheres.length === 3) {
+      this.guideSpheres[0].position.copy(start);
+      this.guideSpheres[1].position.copy(mid);
+      this.guideSpheres[2].position.copy(end);
+    }
   }
 
   startRecording(): void {
