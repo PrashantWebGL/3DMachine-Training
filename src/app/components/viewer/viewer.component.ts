@@ -897,14 +897,8 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.guideLine.frustumCulled = false;
     this.scene.add(this.guideLine);
 
-    // Debug spheres: start (green), mid (amber), end (red)
-    const mkSphere = (r: number, color: number) =>
-      new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), new THREE.MeshBasicMaterial({ color }));
-    this.guideSpheres = [mkSphere(0.025, 0x00ff00), mkSphere(0.02, 0xffaa00), mkSphere(0.03, 0xff0000)];
-    this.guideSpheres.forEach((s) => {
-      s.frustumCulled = false;
-      this.scene.add(s);
-    });
+    // Debug spheres removed to avoid on-screen dots. Keep array empty so teardown logic stays simple.
+    this.guideSpheres = [];
   }
 
   private teardownGuideLine(): void {
@@ -980,10 +974,9 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.guideMat.needsUpdate = true;
 
     // Debug spheres
-    if (this.guideSpheres.length === 3) {
+    if (this.guideSpheres.length >= 2) {
       this.guideSpheres[0].position.copy(start);
-      this.guideSpheres[1].position.copy(mid);
-      this.guideSpheres[2].position.copy(end);
+      this.guideSpheres[this.guideSpheres.length - 1].position.copy(end);
     }
   }
 
