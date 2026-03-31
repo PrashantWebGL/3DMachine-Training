@@ -425,8 +425,10 @@ textarea:focus {
 
 .ar-overlay-controls {
   position: fixed;
+  top: 12px;
   left: 12px;
-  bottom: 12px;
+  right: 12px;
+  bottom: auto;
   z-index: 9999;
   display: flex;
   gap: 8px;
