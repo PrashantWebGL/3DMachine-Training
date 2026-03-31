@@ -425,10 +425,9 @@ textarea:focus {
 
 .ar-overlay-controls {
   position: fixed;
-  top: 12px;
   left: 12px;
   right: 12px;
-  bottom: auto;
+  bottom: 72px; // sit just above AR stop button (which is near bottom)
   z-index: 9999;
   display: flex;
   gap: 8px;
