@@ -5,7 +5,10 @@ export interface Tag3D {
   title: string;
   description: string;
   audioUrl?: string;
+  /** Position in world space (legacy) or model-local space if localPosition is set. */
   position: { x: number; y: number; z: number };
+  /** Preferred: position stored in model-local coordinates to stay attached through transforms. */
+  localPosition?: { x: number; y: number; z: number };
   /** 
    * If set, tag is visible only between these times (seconds) unless alwaysVisible is true.
    * Defaults to full animation range.

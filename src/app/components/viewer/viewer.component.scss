@@ -111,6 +111,79 @@
   pointer-events: auto;
 }
 
+.tag-dot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 6;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  display: inline-block;
+}
+
+.tag-dot:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.tag-dot.playing {
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.tag-dot .ring {
+  position: absolute;
+  border-radius: 50%;
+  display: block;
+}
+
+.tag-dot .outer {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+}
+
+.tag-dot .middle {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+}
+
+.tag-dot .inner {
+  width: 6px;
+  height: 6px;
+  background: #ffffff;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
 .tag-close {
   position: absolute;
   top: 4px;
@@ -273,6 +346,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.tag-popup {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  max-width: 240px;
+  background: #ffffff;
+  border: 1px solid #dbe4ff;
+  box-shadow: 0 12px 30px rgba(15, 37, 98, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  z-index: 15;
 }
 
 .tag-list {

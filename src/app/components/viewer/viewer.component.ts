@@ -19,6 +19,7 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { Course, Tag3D, AnimationStop, UserRole } from '../../models/course.model';
+import { CatmullRomCurve3, Line, LineBasicMaterial } from 'three';
 
 @Component({
   selector: 'app-viewer',
@@ -79,12 +80,19 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   // stop navigation state
   private navigationTarget: number | null = null;
   private navigationDirection: 'forward' | 'backward' | null = null;
+  activeTag: Tag3D | null = null;
+  playingTagId: string | null = null;
+  private audioPlayer: HTMLAudioElement | null = null;
+  activeTagScreen: { x: number; y: number } | null = null;
   // Pinch zoom
   private pinchStartDist = 0;
   private pinchBaseScale = 1;
   private pinchTargetScale = 1;
   private pinchSmooth = 0.15;
   private pinchListenerCleanup: (() => void) | null = null;
+  // AR guide line
+  private guideLine: Line | null = null;
+  private guideMaterial = new LineBasicMaterial({ color: 0x1e5eff, transparent: true, opacity: 0.8 });
 
   constructor(private cdr: ChangeDetectorRef) { }
   private isInitialized = false;
@@ -178,12 +186,17 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.1;
+    this.controls.addEventListener('change', () => {
+      this.activeTag = null;
+      this.activeTagScreen = null;
+    });
 
     this.scene.background = new THREE.Color(0xf6f8ff);
 
     this.setupXRButtons();
     this.setupPointerHandler();
     this.setupPinchZoom();
+    this.setupGuideLine();
   }
 
   private addLights(): void {
@@ -324,6 +337,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
           this.checkNavigationTarget();
         }
 
+        this.updateGuideLine();
         this.updatePinchZoom();
         this.currentTime = this.activeAction ? this.activeAction.time : 0;
         this.updateTagsScreenPositions();
@@ -567,12 +581,16 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (!this.model || !this.camera) return;
     const visibleTags = this.tags.filter((tag) => this.shouldDisplayTag(tag));
     this.projectedTags = visibleTags.map((tag) => {
-      const pos = new THREE.Vector3(tag.position.x, tag.position.y, tag.position.z);
+      const pos = this.getTagWorldPosition(tag);
       const projected = pos.project(this.camera);
       const x = (projected.x * 0.5 + 0.5) * this.renderer.domElement.clientWidth;
       const y = (-projected.y * 0.5 + 0.5) * this.renderer.domElement.clientHeight;
       return { ...tag, screenX: x, screenY: y };
     });
+    if (this.activeTag) {
+      const p = this.projectedTags.find((t) => t.id === this.activeTag!.id);
+      this.activeTagScreen = p ? { x: p.screenX, y: p.screenY } : null;
+    }
   }
 
   private shouldDisplayTag(tag: Tag3D): boolean {
@@ -620,6 +638,11 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       visibleTo,
       alwaysVisible: !!form.alwaysVisible,
     };
+    if (this.model && this.pendingTagPosition) {
+      const local = this.model.worldToLocal(this.pendingTagPosition.clone());
+      tag.localPosition = { x: local.x, y: local.y, z: local.z };
+      tag.position = { ...tag.localPosition };
+    }
     this.tags = [...this.tags, tag];
     this.pendingTagPosition = null;
     this.tagsChange.emit(this.tags);
@@ -627,20 +650,60 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   removeTag(id: string): void {
+    if (this.playingTagId === id && this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer = null;
+      this.playingTagId = null;
+    }
     this.tags = this.tags.filter((t) => t.id !== id);
+    if (this.activeTag?.id === id) {
+      this.closeTag();
+    }
     this.tagsChange.emit(this.tags);
   }
 
   playTagAudio(tag: Tag3D): void {
     if (!tag.audioUrl) return;
+    // toggle if same tag is playing
+    if (this.playingTagId === tag.id && this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer.currentTime = 0;
+      this.playingTagId = null;
+      this.audioPlayer = null;
+      return;
+    }
+
+    if (this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer = null;
+    }
     const audio = new Audio(tag.audioUrl);
+    this.audioPlayer = audio;
+    this.playingTagId = tag.id;
+    audio.onended = () => {
+      this.playingTagId = null;
+      this.audioPlayer = null;
+      this.cdr.markForCheck();
+    };
     audio.play();
+    this.cdr.markForCheck();
   }
 
   hideTag(id: string): void {
     this.tags = this.tags.map((t) => (t.id === id ? { ...t, hidden: true } : t));
     this.tagsChange.emit(this.tags);
     this.updateTagsScreenPositions();
+  }
+
+  openTag(tag: Tag3D): void {
+    this.activeTag = tag;
+    const projected = this.projectedTags.find((t) => t.id === tag.id);
+    this.activeTagScreen = projected ? { x: projected.screenX, y: projected.screenY } : null;
+  }
+
+  closeTag(): void {
+    this.activeTag = null;
+    this.activeTagScreen = null;
   }
 
   addStop(time: number, label?: string): void {
@@ -821,6 +884,53 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     const current = this.model.scale.x;
     const next = THREE.MathUtils.lerp(current, this.pinchTargetScale, this.pinchSmooth);
     this.model.scale.setScalar(next);
+  }
+
+  private getTagWorldPosition(tag: Tag3D): THREE.Vector3 {
+    const vec = new THREE.Vector3();
+    if (tag.localPosition && this.model) {
+      vec.set(tag.localPosition.x, tag.localPosition.y, tag.localPosition.z);
+      return vec.applyMatrix4(this.model.matrixWorld);
+    }
+    if (tag.position) {
+      vec.set(tag.position.x, tag.position.y, tag.position.z);
+      return vec;
+    }
+    return vec;
+  }
+
+  private setupGuideLine(): void {
+    const geom = new THREE.BufferGeometry();
+    this.guideLine = new Line(geom, this.guideMaterial);
+    this.guideLine.visible = false;
+    this.scene.add(this.guideLine);
+  }
+
+  private updateGuideLine(): void {
+    if (!this.guideLine || !this.model || !this.camera) return;
+    // Show guide mainly in AR; keep for normal view optional
+    const shouldShow = this.renderer.xr.isPresenting;
+    this.guideLine.visible = shouldShow;
+    if (!shouldShow) return;
+
+    const start = this.camera.getWorldPosition(new THREE.Vector3());
+    const box = new THREE.Box3().setFromObject(this.model);
+    const end = box.getCenter(new THREE.Vector3());
+    const mid = start.clone().lerp(end, 0.5);
+    const lift = Math.max(start.distanceTo(end) * 0.2, 0.1);
+    mid.y += lift;
+
+    const curve = new CatmullRomCurve3([start, mid, end]);
+    const points = curve.getPoints(40);
+    const positions = new Float32Array(points.length * 3);
+    points.forEach((p, i) => {
+      positions[i * 3] = p.x;
+      positions[i * 3 + 1] = p.y;
+      positions[i * 3 + 2] = p.z;
+    });
+
+    this.guideLine.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.guideLine.geometry.computeBoundingSphere();
   }
 
   startRecording(): void {

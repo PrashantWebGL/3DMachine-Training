@@ -16,21 +16,45 @@
 <div class="viewer-shell">
   <div #rendererHost class="renderer-host">
     <div class="error" *ngIf="loadError">{{ loadError }}</div>
-    <div
+    <button
       *ngFor="let tag of projectedTags"
-      class="tag-badge"
+      class="tag-dot"
+      [hidden]="activeTag?.id === tag.id"
+      [class.playing]="playingTagId === tag.id"
       [style.left.px]="tag.screenX"
       [style.top.px]="tag.screenY"
+      (click)="openTag(tag)"
+      title="{{ tag.title }}"
     >
-      <button class="tag-close" (click)="hideTag(tag.id)" title="Hide tag">✕</button>
-      <div class="tag-title">{{ tag.title }}</div>
-      <div class="tag-desc">{{ tag.description }}</div>
+      <span class="ring outer"></span>
+      <span class="ring middle"></span>
+      <span class="ring inner"></span>
+    </button>
+    <div *ngIf="pendingTagPosition && editMode" class="pending-hint">Click save tag below to confirm</div>
+    <div class="ar-overlay-controls" *ngIf="xrPresenting">
+      <button class="primary" (click)="togglePlay()">{{ isPlaying ? 'Pause' : 'Play' }} (AR)</button>
+      <button class="ghost" type="button" (click)="jumpToPreviousStop()" [disabled]="animationStops.length === 0">◀ Prev</button>
+      <button class="ghost" type="button" (click)="jumpToNextStop()" [disabled]="animationStops.length === 0">Next ▶</button>
+      <button class="ghost" type="button" (click)="seek(0)">⏮ Reset</button>
+    </div>
+    <div
+      class="tag-popup"
+      *ngIf="activeTag && activeTagScreen"
+      [style.left.px]="activeTagScreen.x"
+      [style.top.px]="activeTagScreen.y"
+    >
+      <button class="tag-close" (click)="closeTag()" title="Close">✕</button>
+      <div class="tag-title">{{ activeTag.title }}</div>
+      <div class="tag-desc small">{{ activeTag.description }}</div>
       <div class="tag-actions">
-        <button *ngIf="tag.audioUrl" class="ghost" (click)="playTagAudio(tag)">▶ Audio</button>
-        <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">Remove</button>
+        <button *ngIf="activeTag.audioUrl" class="ghost" (click)="playTagAudio(activeTag)">
+          {{ playingTagId === activeTag.id ? 'Stop audio' : 'Play audio' }}
+        </button>
+        <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(activeTag.id); closeTag()">
+          Remove
+        </button>
       </div>
     </div>
-    <div *ngIf="pendingTagPosition && editMode" class="pending-hint">Click save tag below to confirm</div>
   </div>
 
   <div class="panel">
@@ -51,13 +75,6 @@
       </label>
       <span class="timecode">{{ currentTime | number : '1.1-2' }}s / {{ animationDuration | number : '1.1-2' }}s</span>
     </div>
-    <div class="ar-overlay-controls" *ngIf="xrPresenting">
-      <button class="primary" (click)="togglePlay()">{{ isPlaying ? 'Pause' : 'Play' }} (AR)</button>
-      <button class="ghost" type="button" (click)="jumpToPreviousStop()" [disabled]="animationStops.length === 0">◀ Prev</button>
-      <button class="ghost" type="button" (click)="jumpToNextStop()" [disabled]="animationStops.length === 0">Next ▶</button>
-      <button class="ghost" type="button" (click)="seek(0)">⏮ Reset</button>
-    </div>
-
     <div class="split">
       <div class="section">
         <div class="section-title">Timeline Stops</div>
@@ -159,7 +176,9 @@
               </div>
             </div>
             <div class="actions">
-              <button *ngIf="tag.audioUrl" class="ghost" (click)="playTagAudio(tag)">Play audio</button>
+              <button *ngIf="tag.audioUrl" class="ghost" (click)="playTagAudio(tag)">
+                {{ playingTagId === tag.id ? 'Stop audio' : 'Play audio' }}
+              </button>
               <button *ngIf="role === 'trainer' && editMode" class="ghost danger" (click)="removeTag(tag.id)">
                 Remove
               </button>
