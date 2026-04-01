@@ -249,6 +249,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.renderer.xr.addEventListener('sessionstart', (event) => {
       this.onXRSessionStart(event);
       this.xrPresenting = true;
+      this.updateGuideResolution();
       this.cdr.markForCheck();
     });
 
@@ -393,6 +394,7 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.updateGuideResolution();
   };
 
   private disposeCurrentModel(): void {
@@ -882,14 +884,14 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.guideGeom = new LineGeometry();
     this.guideMat = new LineMaterial({
       color: 0xffffff,
-      linewidth: 0.006,
+      linewidth: 0.01,
       dashed: true,
       dashSize: 0.2,
       gapSize: 0.1,
       transparent: true,
       opacity: 1.0,
     });
-    this.guideMat.resolution.set(window.innerWidth, window.innerHeight);
+    this.updateGuideResolution();
     // seed with two points to avoid undefined attributes
     this.guideGeom.setPositions([0, 0, 0, 0, 0, 0]);
     this.guideLine = new Line2(this.guideGeom, this.guideMat);
@@ -916,6 +918,15 @@ export class ViewerComponent implements AfterViewInit, OnDestroy, OnChanges {
       (s.material as any)?.dispose?.();
     });
     this.guideSpheres = [];
+  }
+
+  private updateGuideResolution(): void {
+    if (!this.guideMat || !this.renderer) return;
+    const size = new THREE.Vector2();
+    this.renderer.getSize(size);
+    const dpr = this.renderer.getPixelRatio();
+    this.guideMat.resolution.set(size.x * dpr, size.y * dpr);
+    this.guideMat.needsUpdate = true;
   }
 
   private getTouchDistance(e: TouchEvent): number {
